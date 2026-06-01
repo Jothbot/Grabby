@@ -59,7 +59,6 @@ object GrabbyServerEvents {
 
             val pose = grabData.subLevelAccess.logicalPose()
             val comPos = pose.position()
-            val grabPointWorld = Vector3d(comPos.x(), comPos.y(), comPos.z())
 
 
             val eye = player.getEyePosition()

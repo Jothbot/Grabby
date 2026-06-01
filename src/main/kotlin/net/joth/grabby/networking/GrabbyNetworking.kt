@@ -27,13 +27,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext
 import org.joml.Quaterniond
 import org.joml.Vector3d
 import java.util.UUID
-import kotlin.math.abs
-import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.floor
-import kotlin.math.roundToInt
 
-private const val LINEAR_STIFFNESS = 1000.0
 private const val LINEAR_DAMPING = 50.0
 private const val ANGULAR_STIFFNESS = 13000.0
 private const val ANGULAR_DAMPING = 1000.0
@@ -51,7 +47,7 @@ object GrabbyNetworking {
     }
 
     private fun handleAssemble(packet: GrabAssemblePacket, context: IPayloadContext) {
-        // enqueueing work. fs it says on the function. the network thread queues up work on the main thread to be done as soon as it's able
+        // enqueueing work. as it says on the function. the network thread queues up work on the main thread to be done as soon as it's able
         context.enqueueWork {
             val player = context.player()
             val level = player.level() as? ServerLevel ?: return@enqueueWork // as? returns NULL on a fail, ?: return@enqueueWork returns *from* enqueueWork
@@ -111,9 +107,7 @@ object GrabbyNetworking {
 
 
             val grabPointLocal = packet.hitLocation
-            //val worldPos = subLevelAccess.logicalPose().transformPosition(grabPointLocal)
             val comPos = subLevelAccess.logicalPose().position()
-            //val comWorld = net.minecraft.world.phys.Vec3(comPos.x(), comPos.y(), comPos.z())
             val approxTopSurface = Vec3(comPos.x(), comPos.y() + 0.5, comPos.z())
             val grabDistance = minOf(player.getEyePosition().distanceTo(approxTopSurface), 2.5)
 
@@ -184,7 +178,6 @@ object GrabbyNetworking {
             alignmentConstraint.setMotor(ConstraintJointAxis.ANGULAR_Y, 0.0, ANGULAR_STIFFNESS, ANGULAR_DAMPING, false, 0.0)
             alignmentConstraint.setMotor(ConstraintJointAxis.ANGULAR_Z, 0.0, ANGULAR_STIFFNESS, ANGULAR_DAMPING, false, 0.0)
 
-            // Linear: near-zero stiffness — stop drift, don't force position yet
             alignmentConstraint.setMotor(ConstraintJointAxis.LINEAR_X, 0.0, 0.000001, LINEAR_DAMPING, false, 0.0)
             alignmentConstraint.setMotor(ConstraintJointAxis.LINEAR_Y, 0.0, 0.000001, LINEAR_DAMPING, false, 0.0)
             alignmentConstraint.setMotor(ConstraintJointAxis.LINEAR_Z, 0.0, 0.000001, LINEAR_DAMPING, false, 0.0)

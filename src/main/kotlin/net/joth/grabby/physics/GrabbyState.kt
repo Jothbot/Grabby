@@ -27,8 +27,6 @@ object GrabbyState {
         aligningSubLevels[playerUUID] = data
     }
 
-    fun getAligning(playerUUID: UUID): AlignmentData? = aligningSubLevels[playerUUID]
-
     fun clearAligning(playerUUID: UUID) {
         aligningSubLevels.remove(playerUUID)?.alignmentConstraint?.remove()
     }
