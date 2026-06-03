@@ -28,7 +28,7 @@ object GrabbyItems {
 
     private fun onBuildCreativeTab(event: BuildCreativeModeTabContentsEvent) {
         if (event.tabKey == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(PLUMB_BOB)
+            event.accept(PLUMB_BOB.get())
         }
     }
 }
