@@ -7,6 +7,8 @@ import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.phys.Vec3
+import org.joml.Quaterniond
+import java.util.UUID
 
 
 private val VEC3_CODEC: StreamCodec<RegistryFriendlyByteBuf, Vec3> = StreamCodec.of(
@@ -80,6 +82,47 @@ data class GrabSubLevelPacket(val pos: BlockPos, val hitLocation: Vec3) : Custom
                 VEC3_CODEC, GrabSubLevelPacket::hitLocation,
                 ::GrabSubLevelPacket
             )
+    }
+}
+
+// this ones a big one
+data class MovingItemDragPacket(val subLevelId: UUID, val orientation: Quaterniond) : CustomPacketPayload {
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+
+    companion object {
+        val TYPE: CustomPacketPayload.Type<MovingItemDragPacket> =
+            CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath(Grabby.MOD_ID, "moving_item_drag"))
+
+        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, MovingItemDragPacket> = StreamCodec.of(
+            { buf, packet ->
+                buf.writeUUID(packet.subLevelId)
+                buf.writeDouble(packet.orientation.x)
+                buf.writeDouble(packet.orientation.y)
+                buf.writeDouble(packet.orientation.z)
+                buf.writeDouble(packet.orientation.w)
+            },
+            { buf ->
+                val id = buf.readUUID()
+                val x = buf.readDouble(); val y = buf.readDouble()
+                val z = buf.readDouble(); val w = buf.readDouble()
+                MovingItemDragPacket(id, Quaterniond(x, y, z, w))
+            }
+        )
+    }
+}
+
+
+data class MovingItemGrabConfirmPacket(val subLevelId: UUID) : CustomPacketPayload {
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+
+    companion object {
+        val TYPE: CustomPacketPayload.Type<MovingItemGrabConfirmPacket> =
+            CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath(Grabby.MOD_ID, "moving_item_grab_confirm"))
+
+        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, MovingItemGrabConfirmPacket> = StreamCodec.of(
+            { buf, packet -> buf.writeUUID(packet.subLevelId) },
+            { buf -> MovingItemGrabConfirmPacket(buf.readUUID()) }
+        )
     }
 }
 

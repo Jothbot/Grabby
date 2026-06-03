@@ -14,8 +14,16 @@ object GrabbyKeybinds {
         "key.categories.grabby"
     )
 
+    val ROTATE_KEY: KeyMapping = KeyMapping(
+        "key.grabby.rotate",
+        InputConstants.Type.KEYSYM,
+        GLFW.GLFW_KEY_TAB,
+        "key.categories.grabby"
+    )
+
     @SubscribeEvent
     fun onRegisterKeyMappings(event: RegisterKeyMappingsEvent) {
         event.register(GRAB_KEY)
+        event.register(ROTATE_KEY)
     }
 }

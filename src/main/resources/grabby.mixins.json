@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "net.joth.grabby.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [],
+  "client": [
+    "MouseHandlerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

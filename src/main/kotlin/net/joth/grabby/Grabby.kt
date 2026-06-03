@@ -2,6 +2,7 @@ package net.joth.grabby
 
 import net.joth.grabby.client.GrabbyClientEvents
 import net.joth.grabby.client.GrabbyKeybinds
+import net.joth.grabby.items.GrabbyItems
 import net.joth.grabby.networking.GrabbyNetworking
 import net.joth.grabby.physics.GrabbyServerEvents
 import net.neoforged.api.distmarker.Dist
@@ -25,6 +26,7 @@ class Grabby(modBus: IEventBus, dist: Dist, modContainer: ModContainer) {
 
         modBus.addListener(::onCommonSetup)
         modBus.register(GrabbyNetworking)
+        GrabbyItems.register(modBus)
 
         modContainer.registerConfig(ModConfig.Type.SERVER, GrabbyConfig.SPEC)
         NeoForge.EVENT_BUS.register(GrabbyServerEvents)

@@ -1,4 +1,7 @@
 {
   "key.categories.grabby": "Grabby",
-  "key.grabby.grab": "Grab"
+  "key.grabby.grab": "Grab",
+  "key.grabby.rotate": "Rotate (Moving Item)",
+
+  "item.grabby.moving_item": "Moving Item"
 }

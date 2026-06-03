@@ -39,7 +39,7 @@ object GrabbyConfig {
 
         maxDisassemblySize = builder
             .comment("Maximum number of blocks in a sub-level that can be disassembled.")
-            .defineInRange("maxDisassemblySize", 2, 1, 64)
+            .defineInRange("maxDisassemblySize", 6, 1, 64)
 
         disassemblyPositionTolerance = builder
             .comment("How close to the block grid the sub-level must be before it can be disassembled (in blocks).")

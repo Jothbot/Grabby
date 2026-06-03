@@ -27,6 +27,9 @@ object GrabbyServerEvents {
     private const val LINEAR_STIFFNESS = 1000.0
     private const val LINEAR_DAMPING = 50.0
 
+    private const val MOVING_ANGULAR_STIFFNESS = 400.0
+    private const val MOVING_ANGULAR_DAMPING = 40.0
+
     @SubscribeEvent
     fun onServerTick(event: ServerTickEvent.Post) { //ServerTickEvent -> every tick, Post -> after all the logic has processed that tick
         val server = ServerLifecycleHooks.getCurrentServer() ?: return  //Just regular old "stop running this when something stupid like "server code run without server" is happening"
@@ -108,17 +111,26 @@ object GrabbyServerEvents {
 
             grabData.constraintHandle?.remove()
 
+            val targetOrientation = grabData.targetOrientation ?: Quaterniond()
             val constraint = pipeline.addConstraint(
                 null, subLevel,
-                FreeConstraintConfiguration(constraintGoal, constraintPosition, Quaterniond())
+                FreeConstraintConfiguration(constraintGoal, constraintPosition, targetOrientation)
             )
 
             for (axis in ConstraintJointAxis.LINEAR) {
                 constraint.setMotor(axis, 0.0, springConstant, dampingConstant, true, maxForce)
             }
 
-            for (axis in ConstraintJointAxis.ANGULAR) {
-                constraint.setMotor(axis, 0.0, 0.0, angularDamping, true, maxForce)
+            if (grabData.targetOrientation != null) {
+                // grab with the moving item, dampened rotation
+                for (axis in ConstraintJointAxis.ANGULAR) {
+                    constraint.setMotor(axis, 0.0, MOVING_ANGULAR_STIFFNESS, MOVING_ANGULAR_DAMPING, true, maxForce)
+                }
+            } else {
+                // nomral grab
+                for (axis in ConstraintJointAxis.ANGULAR) {
+                    constraint.setMotor(axis, 0.0, 0.0, angularDamping, true, maxForce)
+                }
             }
 
             grabData.constraintHandle = constraint

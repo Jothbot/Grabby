@@ -10,6 +10,8 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel
 import net.joth.grabby.physics.GrabData
 import net.joth.grabby.Grabby
 import net.joth.grabby.GrabbyConfig
+import net.joth.grabby.compat.AccessoriesCompat
+import net.joth.grabby.items.MovingItem
 import net.joth.grabby.physics.AlignmentData
 import net.joth.grabby.physics.GrabbyAssemblyHelper
 import net.joth.grabby.physics.GrabbyState
@@ -22,6 +24,7 @@ import net.minecraft.sounds.SoundSource
 import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.phys.Vec3
 import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.network.PacketDistributor
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import net.neoforged.neoforge.network.handling.IPayloadContext
 import org.joml.Quaterniond
@@ -44,6 +47,8 @@ object GrabbyNetworking {
         registrar.playToServer(GrabSubLevelPacket.TYPE, GrabSubLevelPacket.STREAM_CODEC, ::handleGrabSubLevel)
         registrar.playToServer(GrabReleasePacket.TYPE, GrabReleasePacket.STREAM_CODEC, ::handleRelease)
         registrar.playToServer(DisassemblePacket.TYPE, DisassemblePacket.STREAM_CODEC, ::handleDisassemble)
+        registrar.playToServer(MovingItemDragPacket.TYPE, MovingItemDragPacket.STREAM_CODEC, ::handleMovingItemDrag)
+        registrar.playToClient(MovingItemGrabConfirmPacket.TYPE, MovingItemGrabConfirmPacket.STREAM_CODEC, ::handleMovingItemGrabConfirm)
     }
 
     private fun handleAssemble(packet: GrabAssemblePacket, context: IPayloadContext) {
@@ -54,7 +59,7 @@ object GrabbyNetworking {
             val pos = packet.pos
 
             if (level.getBlockState(pos).isAir) return@enqueueWork
-            if (!player.mainHandItem.isEmpty) return@enqueueWork
+            if (!player.mainHandItem.isEmpty && player.mainHandItem.item !is MovingItem && !AccessoriesCompat.isMovingItemEquipped(player)) return@enqueueWork
 
             val blocks = GrabbyAssemblyHelper.gatherConnectedBlocks(level, pos)
             val bounds = BoundingBox3i.from(blocks)
@@ -72,8 +77,16 @@ object GrabbyNetworking {
                 val approxTopSurface = Vec3(comPos.x(), comPos.y() + 0.5, comPos.z())
                 val grabDistance = minOf(player.getEyePosition().distanceTo(approxTopSurface), 2.5)
 
-                GrabbyState.setHeld(player.uuid, GrabData(subLevel, subLevelAccess, grabPointLocal, grabDistance))
+                val grabData = GrabData(subLevel, subLevelAccess, grabPointLocal, grabDistance).also {
+                    if (player.mainHandItem.item is MovingItem || AccessoriesCompat.isMovingItemEquipped(player)) {
+                        it.targetOrientation = org.joml.Quaterniond()
+                    }
+                }
+                GrabbyState.setHeld(player.uuid, grabData)
                 Grabby.LOGGER.info("Assembled and auto-grabbed sub-level ${subLevel.uniqueId}")
+                if (grabData.targetOrientation != null) {
+                    PacketDistributor.sendToPlayer(player as ServerPlayer, MovingItemGrabConfirmPacket(subLevel.uniqueId))
+                }
                 GrabbyState.queueNeighborUpdates(level, blocks)
             }
         }
@@ -91,7 +104,7 @@ object GrabbyNetworking {
             val pos = packet.pos
             Grabby.LOGGER.info("grab: received pos ${packet.pos}")
 
-            if (!player.mainHandItem.isEmpty) {
+            if (!player.mainHandItem.isEmpty && player.mainHandItem.item !is MovingItem && !AccessoriesCompat.isMovingItemEquipped(player)) {
                 Grabby.LOGGER.info("grab: rejected - hand not empty")
                 return@enqueueWork
             }
@@ -189,6 +202,21 @@ object GrabbyNetworking {
                 blocks
             )
             )
+        }
+    }
+
+    private fun handleMovingItemDrag(packet: MovingItemDragPacket, context: IPayloadContext) {
+        context.enqueueWork {
+            val grabData = GrabbyState.getHeld(context.player().uuid) ?: return@enqueueWork
+            if (grabData.subLevel.uniqueId == packet.subLevelId) {
+                grabData.targetOrientation = packet.orientation
+            }
+        }
+    }
+
+    private fun handleMovingItemGrabConfirm(packet: MovingItemGrabConfirmPacket, context: IPayloadContext) {
+        context.enqueueWork {
+            net.joth.grabby.client.GrabbyClientEvents.onGrabConfirm(packet.subLevelId)
         }
     }
 

@@ -16,9 +16,10 @@ import org.joml.Vector3d
 class GrabData(
     val subLevel: ServerSubLevel,
     val subLevelAccess: SubLevelAccess,
-    val grabPointLocal: Vec3,  // position of the grabbed block in plot space
-    val grabDistance: Double, // how far from the player's eyes when grabbed
+    val grabPointLocal: Vec3,
+    val grabDistance: Double,
     var constraintHandle: PhysicsConstraintHandle? = null,
     var goalFreezeTicksRemaining: Int = 0,
-    var frozenGoal: Vector3d? = null
+    var frozenGoal: Vector3d? = null,
+    var targetOrientation: org.joml.Quaterniond? = null
 )
