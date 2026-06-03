@@ -1,11 +1,14 @@
 package net.joth.grabby.physics
 
+import net.minecraft.core.BlockPos
+import net.minecraft.server.level.ServerLevel
 import java.util.UUID
 
 object GrabbyState {
     // map of UUIDs of players and what sublevel they're holding
     private val heldSubLevels = mutableMapOf<UUID, GrabData>()
     private val aligningSubLevels = mutableMapOf<UUID, AlignmentData>()
+    private val pendingNeighborUpdates = mutableListOf<Pair<ServerLevel, Collection<BlockPos>>>()
 
     // adding a pair of UUID - Sublevel to that map
     fun setHeld(playerUUID: UUID, data: GrabData) {
@@ -32,4 +35,14 @@ object GrabbyState {
     }
 
     fun getAllAligning(): Map<UUID, AlignmentData> = aligningSubLevels.toMap()
+
+    fun queueNeighborUpdates(level: ServerLevel, positions: Collection<BlockPos>) {
+        pendingNeighborUpdates.add(level to positions)
+    }
+
+    fun drainNeighborUpdates(): List<Pair<ServerLevel, Collection<BlockPos>>> {
+        val snapshot = pendingNeighborUpdates.toList()
+        pendingNeighborUpdates.clear()
+        return snapshot
+    }
 }

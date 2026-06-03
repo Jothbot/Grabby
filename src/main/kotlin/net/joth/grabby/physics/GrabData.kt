@@ -4,6 +4,7 @@ import dev.ryanhcode.sable.api.physics.constraint.PhysicsConstraintHandle
 import dev.ryanhcode.sable.companion.SubLevelAccess
 import dev.ryanhcode.sable.sublevel.ServerSubLevel
 import net.minecraft.world.phys.Vec3
+import org.joml.Vector3d
 
 // Okay so this whole new approach needs so explaining. Originally I just grabbed the sublevel, reset its velocity
 // and applied a new one to move it to where the player is looking. This *worked*, but it felt like the player was
@@ -17,5 +18,7 @@ class GrabData(
     val subLevelAccess: SubLevelAccess,
     val grabPointLocal: Vec3,  // position of the grabbed block in plot space
     val grabDistance: Double, // how far from the player's eyes when grabbed
-    var constraintHandle: PhysicsConstraintHandle? = null
+    var constraintHandle: PhysicsConstraintHandle? = null,
+    var goalFreezeTicksRemaining: Int = 0,
+    var frozenGoal: Vector3d? = null
 )

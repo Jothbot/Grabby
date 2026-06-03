@@ -74,6 +74,7 @@ object GrabbyNetworking {
 
                 GrabbyState.setHeld(player.uuid, GrabData(subLevel, subLevelAccess, grabPointLocal, grabDistance))
                 Grabby.LOGGER.info("Assembled and auto-grabbed sub-level ${subLevel.uniqueId}")
+                GrabbyState.queueNeighborUpdates(level, blocks)
             }
         }
     }
@@ -151,11 +152,11 @@ object GrabbyNetworking {
             val turns = -floor(yawRad / ninety + 0.5).toInt()
             val disassemblyOrientation = Quaterniond().rotateY(turns * ninety)
 
-            val comLocal = Vector3d(
+            /*val comLocal = Vector3d(
                 subLevel.plot.centerBlock.x + 0.5,
                 subLevel.plot.centerBlock.y + 0.5,
                 subLevel.plot.centerBlock.z + 0.5
-            )
+            )*/
 
             val anchorLocal = Vector3d(
                 subLevel.plot.centerBlock.x + 0.5,
@@ -163,7 +164,7 @@ object GrabbyNetworking {
                 subLevel.plot.centerBlock.z + 0.5
             )
 
-            val comToAnchorOffset = Vector3d(anchorLocal).sub(comLocal)
+            //val comToAnchorOffset = Vector3d(anchorLocal).sub(comLocal)
 
             GrabbyState.clearHeld(player.uuid)
 
@@ -210,19 +211,13 @@ object GrabbyNetworking {
             subLevelAnchor, goal, quarterTurns, rotation, level
         )
 
-        val blocks = mutableListOf<BlockPos>()
-        for (chunk in data.subLevel.plot.loadedChunks) {
-            val chunkBounds = chunk.boundingBox ?: continue
-            for (x in chunkBounds.minX()..chunkBounds.maxX())
-                for (y in chunkBounds.minY()..chunkBounds.maxY())
-                    for (z in chunkBounds.minZ()..chunkBounds.maxZ()) {
-                        val pos = BlockPos(x + chunk.pos.minBlockX, y, z + chunk.pos.minBlockZ)
-                        if (!level.getBlockState(pos).isAir) blocks.add(pos)
-                    }
-        }
+        val blocks = data.blocks
 
         for (block in blocks) {
-            if (!level.getBlockState(transform.apply(block)).isAir) {
+            val dest = transform.apply(block)
+            val existing = level.getBlockState(dest)
+            if (!existing.isAir && !existing.canBeReplaced()) {
+                Grabby.LOGGER.warn("Disassembly blocked: plot pos $block → world pos $dest is occupied by ${existing.block.descriptionId}")
                 player.sendSystemMessage(Component.literal("No space to place the block"))
                 return
             }
@@ -230,6 +225,10 @@ object GrabbyNetworking {
 
         if (blocks.isNotEmpty()) {
             SubLevelAssemblyHelper.moveBlocks(level, transform, blocks)
+            for (block in blocks) {
+                val dest = transform.apply(block)
+                level.updateNeighborsAt(dest, level.getBlockState(dest).block)
+            }
         }
         SubLevelAssemblyHelper.moveTrackingPoints(level, plotBounds, null, transform)
 
@@ -239,9 +238,9 @@ object GrabbyNetworking {
     private fun rotationFromTurns(turns: Int): Rotation =
         when (Math.floorMod(turns, 4)) {
             0 -> Rotation.NONE
-            1 -> Rotation.COUNTERCLOCKWISE_90
+            1 -> Rotation.CLOCKWISE_90
             2 -> Rotation.CLOCKWISE_180
-            3 -> Rotation.CLOCKWISE_90
+            3 -> Rotation.COUNTERCLOCKWISE_90
             else -> Rotation.NONE
         }
 

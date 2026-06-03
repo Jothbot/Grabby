@@ -54,6 +54,7 @@ object GrabbyConfig {
             .defineInRange("alignmentMaxTicks", 100, 20, 600)
 
         builder.pop()
+        builder.pop()
         SPEC = builder.build()
     }
 }
