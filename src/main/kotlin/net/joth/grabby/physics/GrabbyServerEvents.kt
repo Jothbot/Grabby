@@ -15,6 +15,8 @@ import net.minecraft.world.level.block.Block
 import net.minecraft.world.phys.Vec3
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.entity.living.LivingEvent
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent
+import net.neoforged.neoforge.event.level.BlockEvent
 import net.neoforged.neoforge.event.tick.ServerTickEvent
 import net.neoforged.neoforge.server.ServerLifecycleHooks
 import org.joml.Quaterniond
@@ -66,6 +68,8 @@ object GrabbyServerEvents {
                 GrabbyState.clearHeld(playerUUID)
                 continue
             }
+
+            if (player.isSprinting) player.isSprinting = false
 
             // this stop the player from exploiting troll physics
             val standingOn = Sable.HELPER.getTrackingSubLevel(player)
@@ -198,7 +202,24 @@ object GrabbyServerEvents {
         }
     }
 
-    // another anti-troll physics solution
+    @SubscribeEvent
+    fun onLeftClickBlock(event: PlayerInteractEvent.LeftClickBlock) {
+        val player = event.entity as? ServerPlayer ?: return
+        if (GrabbyState.getHeld(player.uuid) != null) event.isCanceled = true
+    }
+
+    @SubscribeEvent
+    fun onBlockBreak(event: BlockEvent.BreakEvent) {
+        val player = event.player as? ServerPlayer ?: return
+        if (GrabbyState.getHeld(player.uuid) != null) event.isCanceled = true
+    }
+
+    @SubscribeEvent
+    fun onRightClickBlock(event: PlayerInteractEvent.RightClickBlock) {
+        val player = event.entity as? ServerPlayer ?: return
+        if (GrabbyState.getHeld(player.uuid) != null) event.isCanceled = true
+    }
+
     @SubscribeEvent
     fun onPlayerJump(event: LivingEvent.LivingJumpEvent) {
         val player = event.entity as? ServerPlayer ?: return

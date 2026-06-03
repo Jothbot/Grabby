@@ -2,6 +2,7 @@ package net.joth.grabby
 
 import net.joth.grabby.client.GrabbyClientEvents
 import net.joth.grabby.client.GrabbyKeybinds
+import net.joth.grabby.compat.AccessoriesCompat
 import net.joth.grabby.items.GrabbyItems
 import net.joth.grabby.networking.GrabbyNetworking
 import net.joth.grabby.physics.GrabbyServerEvents
@@ -52,6 +53,7 @@ class Grabby(modBus: IEventBus, dist: Dist, modContainer: ModContainer) {
 
     private fun onClientSetup(event: FMLClientSetupEvent) {
         LOGGER.log(Level.INFO, "Initializing client...")
+        AccessoriesCompat.registerRenderers()
     }
 
     private fun onServerSetup(event: FMLDedicatedServerSetupEvent) {

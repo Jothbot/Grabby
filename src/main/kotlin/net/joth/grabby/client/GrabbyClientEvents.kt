@@ -3,7 +3,7 @@ package net.joth.grabby.client
 import dev.ryanhcode.sable.Sable
 import dev.ryanhcode.sable.companion.SableCompanion
 import net.joth.grabby.compat.AccessoriesCompat
-import net.joth.grabby.items.MovingItem
+import net.joth.grabby.items.PlumbBobItem
 import net.joth.grabby.networking.DisassemblePacket
 import net.joth.grabby.networking.GrabAssemblePacket
 import net.joth.grabby.networking.GrabReleasePacket
@@ -15,6 +15,7 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
+import net.neoforged.neoforge.client.event.InputEvent
 import net.neoforged.neoforge.network.PacketDistributor
 import org.joml.AxisAngle4d
 import org.joml.Quaterniond
@@ -22,7 +23,7 @@ import java.lang.Math.toRadians
 
 object GrabbyClientEvents {
 
-    var isHolding = false
+    @JvmField var isHolding = false
 
     private var movingItemSubLevelId: java.util.UUID? = null
     private var dragOrientation: Quaterniond? = null
@@ -33,9 +34,11 @@ object GrabbyClientEvents {
         val player = mc.player ?: return
         val level = mc.level ?: return
 
-        val holdingMovingItem = player.mainHandItem.item is MovingItem
+        val holdingMovingItem = player.mainHandItem.item is PlumbBobItem
         val hasMovingItem = holdingMovingItem || AccessoriesCompat.isMovingItemEquipped(player)
         val canAct = player.mainHandItem.isEmpty || hasMovingItem
+
+        if (isHolding) player.setSprinting(false)
 
         GrabbyRotateState.active = hasMovingItem && isHolding && GrabbyKeybinds.ROTATE_KEY.isDown()
 
@@ -102,6 +105,12 @@ object GrabbyClientEvents {
         }
     }
 
+    @SubscribeEvent
+    fun onInteractionKey(event: InputEvent.InteractionKeyMappingTriggered) {
+        if (!isHolding) return
+        event.isCanceled = true
+    }
+
     private fun initMovingItemState(level: net.minecraft.client.multiplayer.ClientLevel, hit: BlockHitResult) {
         val subLevel = Sable.HELPER.getContainingClient(hit.location)
         movingItemSubLevelId = subLevel?.uniqueId
@@ -110,7 +119,11 @@ object GrabbyClientEvents {
 
     fun onGrabConfirm(subLevelId: java.util.UUID) {
         movingItemSubLevelId = subLevelId
+    }
 
+    fun onGrabFailed() {
+        isHolding = false
+        clearMovingItemState()
     }
 
     private fun clearMovingItemState() {

@@ -10,8 +10,9 @@ import dev.ryanhcode.sable.sublevel.ServerSubLevel
 import net.joth.grabby.physics.GrabData
 import net.joth.grabby.Grabby
 import net.joth.grabby.GrabbyConfig
+import net.joth.grabby.GrabbyTags
 import net.joth.grabby.compat.AccessoriesCompat
-import net.joth.grabby.items.MovingItem
+import net.joth.grabby.items.PlumbBobItem
 import net.joth.grabby.physics.AlignmentData
 import net.joth.grabby.physics.GrabbyAssemblyHelper
 import net.joth.grabby.physics.GrabbyState
@@ -49,6 +50,8 @@ object GrabbyNetworking {
         registrar.playToServer(DisassemblePacket.TYPE, DisassemblePacket.STREAM_CODEC, ::handleDisassemble)
         registrar.playToServer(MovingItemDragPacket.TYPE, MovingItemDragPacket.STREAM_CODEC, ::handleMovingItemDrag)
         registrar.playToClient(MovingItemGrabConfirmPacket.TYPE, MovingItemGrabConfirmPacket.STREAM_CODEC, ::handleMovingItemGrabConfirm)
+        registrar.playToClient(FailedGrabPacket.TYPE, FailedGrabPacket.STREAM_CODEC, ::handleFailedGrab)
+        registrar.playToClient(GrabbyHoldingPlayersPacket.TYPE, GrabbyHoldingPlayersPacket.STREAM_CODEC, ::handleHoldingPlayers)
     }
 
     private fun handleAssemble(packet: GrabAssemblePacket, context: IPayloadContext) {
@@ -58,14 +61,28 @@ object GrabbyNetworking {
             val level = player.level() as? ServerLevel ?: return@enqueueWork // as? returns NULL on a fail, ?: return@enqueueWork returns *from* enqueueWork
             val pos = packet.pos
 
-            if (level.getBlockState(pos).isAir) return@enqueueWork
-            if (!player.mainHandItem.isEmpty && player.mainHandItem.item !is MovingItem && !AccessoriesCompat.isMovingItemEquipped(player)) return@enqueueWork
+            val state = level.getBlockState(pos)
+            if (state.isAir) return@enqueueWork
+            if (!player.mainHandItem.isEmpty && player.mainHandItem.item !is PlumbBobItem && !AccessoriesCompat.isMovingItemEquipped(player)) return@enqueueWork
+
+            if (state.`is`(GrabbyTags.BLACKLIST_ASSEMBLY)) {
+                PacketDistributor.sendToPlayer(player as ServerPlayer, FailedGrabPacket.INSTANCE)
+                return@enqueueWork
+            }
+            if (state.canBeReplaced()) {
+                PacketDistributor.sendToPlayer(player as ServerPlayer, FailedGrabPacket.INSTANCE)
+                return@enqueueWork
+            }
 
             val blocks = GrabbyAssemblyHelper.gatherConnectedBlocks(level, pos)
             val bounds = BoundingBox3i.from(blocks)
             val anchor = blocks.first()
             val subLevel = SubLevelAssemblyHelper.assembleBlocks(level, anchor, blocks, bounds)
             Grabby.LOGGER.info("Assembled sub-level ${subLevel?.uniqueId} from ${blocks.size} block(s) at $pos")
+            if (subLevel == null) {
+                PacketDistributor.sendToPlayer(player as ServerPlayer, FailedGrabPacket.INSTANCE)
+                return@enqueueWork
+            }
             if (subLevel != null) {
                 val subLevelAccess = subLevel as dev.ryanhcode.sable.companion.SubLevelAccess
 
@@ -78,7 +95,7 @@ object GrabbyNetworking {
                 val grabDistance = minOf(player.getEyePosition().distanceTo(approxTopSurface), 2.5)
 
                 val grabData = GrabData(subLevel, subLevelAccess, grabPointLocal, grabDistance).also {
-                    if (player.mainHandItem.item is MovingItem || AccessoriesCompat.isMovingItemEquipped(player)) {
+                    if (player.mainHandItem.item is PlumbBobItem || AccessoriesCompat.isMovingItemEquipped(player)) {
                         it.targetOrientation = org.joml.Quaterniond()
                     }
                 }
@@ -88,6 +105,7 @@ object GrabbyNetworking {
                     PacketDistributor.sendToPlayer(player as ServerPlayer, MovingItemGrabConfirmPacket(subLevel.uniqueId))
                 }
                 GrabbyState.queueNeighborUpdates(level, blocks)
+                broadcastHoldingPlayers(player as ServerPlayer)
             }
         }
     }
@@ -104,8 +122,9 @@ object GrabbyNetworking {
             val pos = packet.pos
             Grabby.LOGGER.info("grab: received pos ${packet.pos}")
 
-            if (!player.mainHandItem.isEmpty && player.mainHandItem.item !is MovingItem && !AccessoriesCompat.isMovingItemEquipped(player)) {
+            if (!player.mainHandItem.isEmpty && player.mainHandItem.item !is PlumbBobItem && !AccessoriesCompat.isMovingItemEquipped(player)) {
                 Grabby.LOGGER.info("grab: rejected - hand not empty")
+                PacketDistributor.sendToPlayer(player as ServerPlayer, FailedGrabPacket.INSTANCE)
                 return@enqueueWork
             }
             if (GrabbyState.getHeld(player.uuid) != null) {
@@ -113,11 +132,17 @@ object GrabbyNetworking {
                 return@enqueueWork
             }
 
-            val subLevelAccess = SableCompanion.INSTANCE.getContaining(level, pos) ?: return@enqueueWork
+            val subLevelAccess = SableCompanion.INSTANCE.getContaining(level, pos) ?: run {
+                PacketDistributor.sendToPlayer(player as ServerPlayer, FailedGrabPacket.INSTANCE)
+                return@enqueueWork
+            }
             Grabby.LOGGER.info("grab: subLevelAccess = $subLevelAccess")
             val subLevel = subLevelAccess as? ServerSubLevel
             Grabby.LOGGER.info("grab: subLevel cast = $subLevel")
-            if (subLevel == null) return@enqueueWork
+            if (subLevel == null) {
+                PacketDistributor.sendToPlayer(player as ServerPlayer, FailedGrabPacket.INSTANCE)
+                return@enqueueWork
+            }
 
 
             val grabPointLocal = packet.hitLocation
@@ -128,11 +153,14 @@ object GrabbyNetworking {
             GrabbyState.setHeld(player.uuid, GrabData(subLevel, subLevelAccess, grabPointLocal, grabDistance))
             Grabby.LOGGER.info("grab: success, stored GrabData")
             Grabby.LOGGER.info("Player ${player.name.string} grabbed sub-level ${subLevel.uniqueId}")
+            broadcastHoldingPlayers(player as ServerPlayer)
         }
     }
     private fun handleRelease(packet: GrabReleasePacket, context: IPayloadContext) {
         context.enqueueWork {
-            GrabbyState.clearHeld(context.player().uuid)
+            val player = context.player()
+            GrabbyState.clearHeld(player.uuid)
+            broadcastHoldingPlayers(player as ServerPlayer)
         }
     }
     private fun handleDisassemble(packet: DisassemblePacket, context: IPayloadContext) {
@@ -218,6 +246,24 @@ object GrabbyNetworking {
         context.enqueueWork {
             net.joth.grabby.client.GrabbyClientEvents.onGrabConfirm(packet.subLevelId)
         }
+    }
+
+    private fun handleFailedGrab(packet: FailedGrabPacket, context: IPayloadContext) {
+        context.enqueueWork {
+            net.joth.grabby.client.GrabbyClientEvents.onGrabFailed()
+        }
+    }
+
+    private fun handleHoldingPlayers(packet: GrabbyHoldingPlayersPacket, context: IPayloadContext) {
+        context.enqueueWork {
+            net.joth.grabby.client.GrabbyHoldingPlayers.players.clear()
+            net.joth.grabby.client.GrabbyHoldingPlayers.players.addAll(packet.holdingPlayerUuids)
+        }
+    }
+
+    private fun broadcastHoldingPlayers(player: ServerPlayer) {
+        val packet = GrabbyHoldingPlayersPacket(GrabbyState.getAllHeld().keys.toList())
+        PacketDistributor.sendToAllPlayers(packet)
     }
 
     internal fun executeDisassembly(playerUUID: UUID, data: AlignmentData, level: ServerLevel, player: ServerPlayer) {

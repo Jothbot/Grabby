@@ -1,7 +1,7 @@
 {
   "key.categories.grabby": "Grabby",
   "key.grabby.grab": "Grab",
-  "key.grabby.rotate": "Rotate (Moving Item)",
+  "key.grabby.rotate": "Rotate (Plumb Bob)",
 
-  "item.grabby.moving_item": "Moving Item"
+  "item.grabby.plumb_bob": "Plumb Bob"
 }

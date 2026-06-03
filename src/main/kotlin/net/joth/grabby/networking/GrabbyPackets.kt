@@ -126,6 +126,36 @@ data class MovingItemGrabConfirmPacket(val subLevelId: UUID) : CustomPacketPaylo
     }
 }
 
+data class GrabbyHoldingPlayersPacket(val holdingPlayerUuids: List<UUID>) : CustomPacketPayload {
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+
+    companion object {
+        val TYPE: CustomPacketPayload.Type<GrabbyHoldingPlayersPacket> =
+            CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath(Grabby.MOD_ID, "holding_players"))
+
+        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, GrabbyHoldingPlayersPacket> = StreamCodec.of(
+            { buf, packet ->
+                buf.writeCollection(packet.holdingPlayerUuids) { b, uuid -> b.writeUUID(uuid) }
+            },
+            { buf -> GrabbyHoldingPlayersPacket(buf.readList { it.readUUID() }) }
+        )
+    }
+}
+
+class FailedGrabPacket : CustomPacketPayload {
+    override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
+
+    companion object {
+        val TYPE: CustomPacketPayload.Type<FailedGrabPacket> =
+            CustomPacketPayload.Type(ResourceLocation.fromNamespaceAndPath(Grabby.MOD_ID, "failed_grab"))
+
+        val INSTANCE = FailedGrabPacket()
+
+        val STREAM_CODEC: StreamCodec<RegistryFriendlyByteBuf, FailedGrabPacket> =
+            StreamCodec.unit(INSTANCE)
+    }
+}
+
 class DisassemblePacket : CustomPacketPayload {
     override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = TYPE
 

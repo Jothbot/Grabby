@@ -11,4 +11,9 @@ object AccessoriesCompat {
         if (!isLoaded) return false
         return AccessoriesIntegration.isMovingItemEquipped(entity)
     }
+
+    fun registerRenderers() {
+        if (!isLoaded) return
+        AccessoriesIntegration.registerRenderers()
+    }
 }
